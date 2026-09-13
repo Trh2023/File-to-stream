@@ -1,14 +1,19 @@
+# app.py
 import os
 import asyncio
 import secrets
 import traceback
-import uvicorn
 import re
 import logging
 from contextlib import asynccontextmanager
 
 from pyrogram import Client, filters, enums
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ChatMemberUpdated
+from pyrogram.types import (
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ChatMemberUpdated,
+)
 from pyrogram.errors import (
     FloodWait,
     UserNotParticipant,
@@ -18,12 +23,11 @@ from pyrogram.errors import (
 )
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pyrogram.file_id import FileId
 from pyrogram import raw
 from pyrogram.session import Session, Auth
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 import math
 
 # Project ki dusri files se important cheezein import karo
@@ -34,7 +38,7 @@ from database import db
 # --- SETUP: BOT, WEB SERVER, AUR LOGGING ---
 # =====================================================================================
 
-# ✅ FIX: Track bot readiness for health check
+# ✅ Bot readiness status for health check
 bot_ready = {"status": False, "error": None}
 
 
@@ -45,16 +49,13 @@ async def lifespan(app: FastAPI):
     """
     print("--- Lifespan: Server chalu ho raha hai... ---")
 
-    # ✅ FIX: `bot.loop = asyncio.get_event_loop()` hata diya.
-    # Pyrogram/Kurigram khud current running loop pick kar leta hai.
-
     await db.connect()
 
     try:
         print("Starting main Pyrogram bot...")
         await bot.start()
 
-        # ✅ FIX: Purana webhook delete karo, warna getUpdates khaali aayega
+        # Purana webhook delete karo, warna getUpdates khaali aayega
         try:
             await bot.delete_webhook(drop_pending_updates=False)
             print("✅ Webhook cleared (agar tha to).")
@@ -80,7 +81,9 @@ async def lifespan(app: FastAPI):
                 await bot.get_chat(Config.FORCE_SUB_CHANNEL)
                 print("✅ Force Sub channel accessible hai.")
             except Exception as e:
-                print(f"!!! WARNING: Bot, Force Sub channel mein admin nahi hai. Error: {e}")
+                print(
+                    f"!!! WARNING: Bot, Force Sub channel mein admin nahi hai. Error: {e}"
+                )
 
         try:
             await cleanup_channel(bot)
@@ -91,10 +94,11 @@ async def lifespan(app: FastAPI):
         print("--- Lifespan: Startup safaltapoorvak poora hua. ---")
 
     except Exception as e:
-        # ✅ FIX: Error ko store karo taaki health check mein dikh sake
         bot_ready["status"] = False
         bot_ready["error"] = str(e)
-        print(f"!!! FATAL ERROR: Bot startup ke dauraan error aa gaya: {traceback.format_exc()}")
+        print(
+            f"!!! FATAL ERROR: Bot startup ke dauraan error aa gaya: {traceback.format_exc()}"
+        )
 
     yield
 
@@ -124,6 +128,7 @@ class HideDLFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(HideDLFilter())
 
 
+# ✅ Bot instance (create but don't start here — lifespan handles starting)
 bot = Client(
     "SimpleStreamBot",
     api_id=Config.API_ID,
@@ -148,7 +153,10 @@ class TokenParser:
         return {
             c + 1: t
             for c, (_, t) in enumerate(
-                filter(lambda n: n[0].startswith("MULTI_TOKEN"), sorted(os.environ.items()))
+                filter(
+                    lambda n: n[0].startswith("MULTI_TOKEN"),
+                    sorted(os.environ.items()),
+                )
             )
         }
 
@@ -193,10 +201,10 @@ async def initialize_clients():
 
 def get_readable_file_size(size_in_bytes):
     if not size_in_bytes:
-        return '0B'
+        return "0B"
     power = 1024
     n = 0
-    power_labels = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB'}
+    power_labels = {0: "B", 1: "KB", 2: "MB", 3: "GB"}
     while size_in_bytes >= power and n < len(power_labels) - 1:
         size_in_bytes /= power
         n += 1
@@ -208,18 +216,18 @@ def mask_filename(name: str):
         return "Protected File"
     base, ext = os.path.splitext(name)
     metadata_pattern = re.compile(
-        r'((19|20)\d{2}|4k|2160p|1080p|720p|480p|360p|HEVC|x265|BluRay|WEB-DL|HDRip)',
-        re.IGNORECASE
+        r"((19|20)\d{2}|4k|2160p|1080p|720p|480p|360p|HEVC|x265|BluRay|WEB-DL|HDRip)",
+        re.IGNORECASE,
     )
     match = metadata_pattern.search(base)
     if match:
-        title_part = base[:match.start()].strip(' .-_')
+        title_part = base[: match.start()].strip(" .-_")
         metadata_part = base[match.start():]
     else:
         title_part = base
         metadata_part = ""
-    masked_title = ''.join(
-        c if (i % 3 == 0 and c.isalnum()) else ('*' if c.isalnum() else c)
+    masked_title = "".join(
+        c if (i % 3 == 0 and c.isalnum()) else ("*" if c.isalnum() else c)
         for i, c in enumerate(title_part)
     )
     return f"{masked_title} {metadata_part}{ext}".strip()
@@ -251,12 +259,14 @@ async def start_command(client: Client, message: Message):
                 try:
                     await client.get_chat_member(Config.FORCE_SUB_CHANNEL, user_id)
                 except UserNotParticipant:
-                    channel_username = str(Config.FORCE_SUB_CHANNEL).replace('@', '')
+                    channel_username = str(Config.FORCE_SUB_CHANNEL).replace("@", "")
                     channel_link = f"https://t.me/{channel_username}"
-                    join_button = InlineKeyboardButton("📢 Join Channel", url=channel_link)
+                    join_button = InlineKeyboardButton(
+                        "📢 Join Channel", url=channel_link
+                    )
                     retry_button = InlineKeyboardButton(
                         "✅ Joined",
-                        url=f"https://t.me/{Config.BOT_USERNAME}?start={message.command[1]}"
+                        url=f"https://t.me/{Config.BOT_USERNAME}?start={message.command[1]}",
                     )
                     keyboard = InlineKeyboardMarkup([[join_button], [retry_button]])
                     await message.reply_text(
@@ -267,17 +277,20 @@ async def start_command(client: Client, message: Message):
                     )
                     return
                 except (ChatAdminRequired, ChannelInvalid, ChannelPrivate) as e:
-                    # ✅ FIX: agar bot force-sub channel ka admin nahi hai ya channel galat hai
                     print(f"⚠️ Force sub misconfigured (skipping check): {e}")
-                    # Yahan hum user ko block nahi karenge, sirf warning print karke aage badhenge
                 except Exception as e:
                     print(f"⚠️ Force sub unexpected error: {e}")
 
             final_link = f"{Config.BASE_URL}/show/{unique_id}"
             reply_text = f"__✅ Verification Successful!\n\nCopy Link:__ `{final_link}`"
-            button = InlineKeyboardMarkup([[InlineKeyboardButton("Open Link", url=final_link)]])
+            button = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Open Link", url=final_link)]]
+            )
             await message.reply_text(
-                reply_text, reply_markup=button, quote=True, disable_web_page_preview=True
+                reply_text,
+                reply_markup=button,
+                quote=True,
+                disable_web_page_preview=True,
             )
 
         else:
@@ -303,9 +316,13 @@ async def handle_file_upload(message: Message, user_id: int):
         await db.save_link(unique_id, sent_message.id)
 
         verify_link = f"https://t.me/{Config.BOT_USERNAME}?start=verify_{unique_id}"
-        button = InlineKeyboardMarkup([[InlineKeyboardButton("Get Link Now", url=verify_link)]])
+        button = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Get Link Now", url=verify_link)]]
+        )
 
-        await message.reply_text("__✅ File Uploaded!__", reply_markup=button, quote=True)
+        await message.reply_text(
+            "__✅ File Uploaded!__", reply_markup=button, quote=True
+        )
     except Exception as e:
         print(f"!!! ERROR: {traceback.format_exc()}")
         await message.reply_text("Sorry, something went wrong.")
@@ -361,14 +378,12 @@ async def cleanup_channel(c: Client):
 # --- FASTAPI WEB SERVER ---
 # =====================================================================================
 
-# ✅ FIX: GET aur HEAD dono support karo (uptime monitors ke liye)
 @app.api_route("/", methods=["GET", "HEAD"])
 async def health_check():
     """
     This route provides a 200 OK response for uptime monitors.
     """
     if not bot_ready["status"]:
-        # Health monitors ke liye 200 chahiye, warna 503 dega
         return {
             "status": "starting" if bot_ready["error"] is None else "error",
             "message": bot_ready.get("error") or "Bot is starting up...",
@@ -400,13 +415,12 @@ async def get_file_details_api(request: Request, unique_id: str):
     if not media:
         raise HTTPException(status_code=404, detail="Media not found in the message.")
 
-    # ✅ FIX: file_size None handle karo
     if not media.file_size:
         raise HTTPException(status_code=400, detail="File size unknown.")
 
     file_name = media.file_name or "file"
     safe_file_name = "".join(
-        c for c in file_name if c.isalnum() or c in (' ', '.', '_', '-')
+        c for c in file_name if c.isalnum() or c in (" ", ".", "_", "-")
     ).rstrip()
     mime_type = media.mime_type or "application/octet-stream"
 
@@ -441,7 +455,9 @@ class ByteStreamer:
             thumb_size=f.thumbnail_size,
         )
 
-    async def yield_file(self, f: FileId, i: int, o: int, fc: int, lc: int, pc: int, cs: int):
+    async def yield_file(
+        self, f: FileId, i: int, o: int, fc: int, lc: int, pc: int, cs: int
+    ):
         c = self.client
         work_loads[i] += 1
         ms = c.media_sessions.get(f.dc_id)
@@ -453,7 +469,9 @@ class ByteStreamer:
                     c, f.dc_id, ak, await c.storage.test_mode(), is_media=True
                 )
                 await ms.start()
-                ea = await c.invoke(raw.functions.auth.ExportAuthorization(dc_id=f.dc_id))
+                ea = await c.invoke(
+                    raw.functions.auth.ExportAuthorization(dc_id=f.dc_id)
+                )
                 await ms.invoke(
                     raw.functions.auth.ImportAuthorization(id=ea.id, bytes=ea.bytes)
                 )
@@ -508,14 +526,12 @@ async def stream_media(r: Request, mid: int, fname: str):
         if not m or msg.empty:
             raise FileNotFoundError
 
-        # ✅ FIX: file_size None handle karo
         fsize = m.file_size
         if not fsize:
             raise HTTPException(status_code=400, detail="File size unknown.")
 
         fid = FileId.decode(m.file_id)
 
-        # ✅ FIX: Range header ko safely parse karo
         rh = r.headers.get("Range", "")
         fb, ub = 0, fsize - 1
 
@@ -569,12 +585,3 @@ async def stream_media(r: Request, mid: int, fname: str):
     except Exception:
         print(traceback.format_exc())
         raise HTTPException(500)
-
-
-# =====================================================================================
-# --- MAIN EXECUTION BLOCK ---
-# =====================================================================================
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, log_level="info")
