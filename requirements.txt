@@ -1,5 +1,5 @@
 fastapi[standard]
-pyrogram
+kurigram
 tgcrypto
 python-dotenv
 python-magic
