@@ -189,6 +189,11 @@ def mask_filename(name: str):
 # --- PYROGRAM BOT HANDLERS ---
 # =====================================================================================
 
+# --- CATCH-ALL DEBUG HANDLER (group=-1 means it runs before other handlers) ---
+@bot.on_message(group=-1)
+async def catch_all_debug(client, message):
+    print(f"🔵🔵🔵 UPDATE RECEIVED! chat_id={message.chat.id}, from={message.from_user.id if message.from_user else 'N/A'}, text={message.text}")
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start_command(client: Client, message: Message):
     print(f"🟢 DEBUG: /start ended payam az user {message.from_user.id} rasid")  # <-- این خط رو اضافه کنید
