@@ -191,35 +191,37 @@ def mask_filename(name: str):
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start_command(client: Client, message: Message):
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name
-    
-    if len(message.command) > 1 and message.command[1].startswith("verify_"):
-        unique_id = message.command[1].split("_", 1)[1]
+    print(f"🟢 DEBUG: /start ended payam az user {message.from_user.id} rasid")  # <-- این خط رو اضافه کنید
+    try:
+        user_id = message.from_user.id
+        user_name = message.from_user.first_name
         
-        if Config.FORCE_SUB_CHANNEL:
-            try:
-                await client.get_chat_member(Config.FORCE_SUB_CHANNEL, user_id)
-            except UserNotParticipant:
-                channel_username = str(Config.FORCE_SUB_CHANNEL).replace('@', '')
-                channel_link = f"https://t.me/{channel_username}"
-                join_button = InlineKeyboardButton("📢 Join Channel", url=channel_link)
-                retry_button = InlineKeyboardButton("✅ Joined", url=f"https://t.me/{Config.BOT_USERNAME}?start={message.command[1]}")
-                keyboard = InlineKeyboardMarkup([[join_button], [retry_button]])
-                await message.reply_text(
-                    "**You Must Join Our Channel To Get The Link!**\n\n"
-                    "__Join Channel & Click '✅ Joined'.__",
-                    reply_markup=keyboard, quote=True
-                )
-                return
+        if len(message.command) > 1 and message.command[1].startswith("verify_"):
+            unique_id = message.command[1].split("_", 1)[1]
+            
+            if Config.FORCE_SUB_CHANNEL:
+                try:
+                    await client.get_chat_member(Config.FORCE_SUB_CHANNEL, user_id)
+                except UserNotParticipant:
+                    channel_username = str(Config.FORCE_SUB_CHANNEL).replace('@', '')
+                    channel_link = f"https://t.me/{channel_username}"
+                    join_button = InlineKeyboardButton("📢 Join Channel", url=channel_link)
+                    retry_button = InlineKeyboardButton("✅ Joined", url=f"https://t.me/{Config.BOT_USERNAME}?start={message.command[1]}")
+                    keyboard = InlineKeyboardMarkup([[join_button], [retry_button]])
+                    await message.reply_text(
+                        "**You Must Join Our Channel To Get The Link!**\n\n"
+                        "__Join Channel & Click '✅ Joined'.__",
+                        reply_markup=keyboard, quote=True
+                    )
+                    return
 
-        final_link = f"{Config.BASE_URL}/show/{unique_id}"
-        reply_text = f"__✅ Verification Successful!\n\nCopy Link:__ `{final_link}`"
-        button = InlineKeyboardMarkup([[InlineKeyboardButton("Open Link", url=final_link)]])
-        await message.reply_text(reply_text, reply_markup=button, quote=True, disable_web_page_preview=True)
+            final_link = f"{Config.BASE_URL}/show/{unique_id}"
+            reply_text = f"__✅ Verification Successful!\n\nCopy Link:__ `{final_link}`"
+            button = InlineKeyboardMarkup([[InlineKeyboardButton("Open Link", url=final_link)]])
+            await message.reply_text(reply_text, reply_markup=button, quote=True, disable_web_page_preview=True)
 
-    else:
-        reply_text = f"""
+        else:
+            reply_text = f"""
 👋 **Hello, {user_name}!**
 
 __Welcome To Sharing Box Bot. I Can Help You Create Permanent, Shareable Links For Your Files.__
@@ -228,7 +230,10 @@ __Welcome To Sharing Box Bot. I Can Help You Create Permanent, Shareable Links F
 
 __Just Send Or Forward Any File To Me And I will instantly give you a special link that you can share with anyone!__
 """
-        await message.reply_text(reply_text)
+            await message.reply_text(reply_text)
+    except Exception as e:
+        print(f"🔴 DEBUG ERROR in start_command: {e}")
+        traceback.print_exc()
 
 async def handle_file_upload(message: Message, user_id: int):
     try:
