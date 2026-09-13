@@ -1,5 +1,3 @@
-# app.py (THE REAL, FINAL, CLEAN, EASY-TO-READ FULL CODE)
-
 import os
 import asyncio
 import secrets
@@ -36,7 +34,10 @@ async def lifespan(app: FastAPI):
     Yeh function bot ko web server ke saath start aur stop karta hai.
     """
     print("--- Lifespan: Server chalu ho raha hai... ---")
-    
+
+    # --- FIX: bot ke internal loop ko current running loop se sync karo ---
+    bot.loop = asyncio.get_event_loop()
+
     await db.connect()
     
     try:
